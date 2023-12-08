@@ -1,18 +1,14 @@
 import jakarta.ws.rs.*
 import jakarta.ws.rs.core.Response
+import models.ListResponse
+import models.ListResponseResource
+import models.OtherMediaType
 import org.keycloak.models.KeycloakSession
-import org.keycloak.models.utils.ModelToRepresentation
-import org.keycloak.representations.idm.UserRepresentation
-import org.keycloak.services.managers.AppAuthManager.BearerTokenAuthenticator
-import org.keycloak.services.managers.AuthenticationManager.AuthResult
 import org.keycloak.services.resources.Cors
-import org.keycloak.utils.MediaType
+import java.util.regex.Pattern
 import java.util.stream.Collectors
 
-//@Path("v2")
 class ScimRestResource(private val session: KeycloakSession) {
-    private val auth: AuthResult? = BearerTokenAuthenticator(session).authenticate()
-
     @OPTIONS
     @Path("{any:.*}")
     fun preflight(): Response {
@@ -20,35 +16,61 @@ class ScimRestResource(private val session: KeycloakSession) {
     }
 
     @GET
-    @Path("")
-    @Produces(MediaType.APPLICATION_JSON)
-    fun getUsersByAttr(
-        @QueryParam("key") attrKey: String,
-        @QueryParam("value") attrValue: String,
-        @DefaultValue("100") @QueryParam("maxResults") maxResults: Int
+    @Path("Users")
+    @Produces(OtherMediaType.APPLICATION_SCIM_JSON)
+    fun getUsers(
+        @DefaultValue("") @QueryParam("filter") filterString: String,
+        @DefaultValue("0") @QueryParam("skip") skip: Long,
+        @DefaultValue("100") @QueryParam("limit") limit: Long,
     ): Response {
-        checkRealmAccess()
-        val data: List<UserRepresentation> = session.users()
-            .searchForUserByUserAttributeStream(session.context.realm, attrKey, attrValue)
-            .map { userModel ->
-                ModelToRepresentation.toRepresentation(
-                    session,
-                    session.context.realm,
-                    userModel
-                )
-            }
+        val regex = "(\\w+) eq \"([^\"]*)\"";
+        val response = Pattern.compile(regex);
+        val match = response.matcher(filterString)
+        val found = match.find()
+
+        val attributes = if (found) match.group(1) to match.group(2) else null
+
+//        /scim/v2/Users?filter=userName+eq+%227818078a-5d8c-4e4c-823c-0d3b1ed025b4%22
+
+//        val rawParams = if (found) mapOf(match.group(1) to match.group(2)) else mapOf()
+//        val params = rawParams.mapKeysNotNull { param ->
+//            when (param.key) {
+//                "userName" -> UserModel.USERNAME
+//                "email" -> UserModel.EMAIL
+//                "active" -> UserModel.ENABLED
+//                else -> null
+//            }
+//        }
+
+        val realm = session.context.realm
+        val users = {
+            attributes?.let { attribute ->
+
+                when (attribute.first) {
+                    "userName" -> listOf(session.users().getUserByUsername(realm, attribute.second)).stream()
+                    "email" -> listOf(session.users().getUserByEmail(realm, attribute.second)).stream()
+                    else -> {
+                        session.users().searchForUserByUserAttributeStream(realm, attribute.first, attribute.second)
+                    }
+                }
+
+            } ?: session.users().searchForUserStream(realm, mapOf())
+        }
+
+        val userResources = users().skip(skip).limit(limit).map { ListResponseResource(it.id, it.username) }
             .collect(Collectors.toList())
-        return Response.status(200)
-            .header("Access-Control-Allow-Origin", "*")
-            .entity(data)
-            .build()
+
+        val data = ListResponse(users().count(), skip, userResources.size.toLong(), userResources)
+
+        return Response.status(200).entity(data).build()
     }
 
-    private fun checkRealmAccess() {
-//        if (auth == null) {
-//            throw NotAuthorizedException("Bearer")
-//        } else if (auth.token.realmAccess == null || !auth.token.realmAccess.isUserInRole("fetch_users")) {
-//            throw ForbiddenException("Does not have permission to fetch users")
-//        }
+    @GET
+    @Path("Users/{id}")
+    @Produces(OtherMediaType.APPLICATION_SCIM_JSON)
+    fun getUser(
+        @PathParam("id") id: String
+    ): Response {
+        return Response.status(200).entity(session.users().getUserById(session.context.realm, id)).build()
     }
 }
