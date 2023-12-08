@@ -1,0 +1,7 @@
+services:
+  keycloak:
+    build:
+      context: .
+    ports:
+    - 8080:8080
+    command: --verbose start-dev
