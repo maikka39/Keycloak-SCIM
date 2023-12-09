@@ -12,7 +12,7 @@ data class ListResponse(
     val itemsPerPage: Long,
     val startIndex: Long,
     @field:JsonProperty(value = "Resources")
-    val resources: List<ListResponseResource>,
+    val resources: List<Map<String, String>>,
     val schemas: List<String> = listOf(
         "urn:ietf:params:scim:api:messages:2.0:ListResponse",
     ),
