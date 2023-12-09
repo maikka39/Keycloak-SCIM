@@ -18,6 +18,7 @@ class ScimImpl(private val session: KeycloakSession) {
                 }
             } ?: session.users().searchForUserStream(realm, mapOf())
         }
+
         val userResources = users()
             .skip(searchBody.startIndex)
             .limit(searchBody.count)
@@ -57,11 +58,16 @@ class ScimImpl(private val session: KeycloakSession) {
                 }
             } ?: session.groups().getGroupsStream(realm)
         }
+
         val groupResources = groups()
             .skip(searchBody.startIndex)
             .limit(searchBody.count)
             .map { group ->
-                (group.attributes + mapOf("name" to listOf(group.name)))
+                (group.attributes + mapOf(
+                    "name" to listOf(group.name),
+                    "members" to (if (searchBody.attributes.contains("members")) session.users()
+                        .getGroupMembersStream(realm, group).map { it.id }.collect(Collectors.toList()) else listOf()),
+                ))
                     .filter { searchBody.attributes.contains(it.key) }
                     .filterNot { searchBody.excludedAttributes.contains(it.key) }.filterNot { it.key == "id" }
                     .flatMap { attr ->
