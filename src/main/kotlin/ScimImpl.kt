@@ -1,10 +1,19 @@
-import models.ListResponse
+import extensions.toScimGroup
+import extensions.toScimUser
 import models.SearchBody
+import models.scim.ScimGroup
+import models.scim.ScimListResponse
+import models.scim.ScimUser
 import org.keycloak.models.KeycloakSession
 import java.util.stream.Collectors
 
 class ScimImpl(private val session: KeycloakSession) {
-    fun findUsers(searchBody: SearchBody): ListResponse {
+    fun getUser(id: String): ScimUser? {
+        return session.users().getUserById(session.context.realm, id)
+            ?.toScimUser(listOf("name", "emails", "groups", "roles"))
+    }
+
+    fun findUsers(searchBody: SearchBody): ScimListResponse {
 //        /scim/v2/Users?filter=userName+eq+%227818078a-5d8c-4e4c-823c-0d3b1ed025b4%22
         val realm = session.context.realm
         val users = {
@@ -19,31 +28,17 @@ class ScimImpl(private val session: KeycloakSession) {
             } ?: session.users().searchForUserStream(realm, mapOf())
         }
 
-        val userResources = users()
-            .skip(searchBody.startIndex)
-            .limit(searchBody.count)
-            .map { user ->
-                user.attributes
-                    .mapKeys {
-                        when (it.key) {
-                            "username" -> "userName"
-                            else -> it.key
-                        }
-                    }
-                    .filter { searchBody.attributes.contains(it.key) }
-                    .filterNot { searchBody.excludedAttributes.contains(it.key) }.filterNot { it.key == "id" }
-                    .flatMap { attr ->
-                        if (listOf("userName").contains(attr.key)) listOf(attr.key to attr.value.first())
-                        else attr.value.mapIndexed { index, value -> "${attr.key}[$index]" to value }
-                    }
-                    .toMap() + mapOf("id" to user.id)
-            }
-            .collect(Collectors.toList()).toList()
+        val userResources = users().skip(searchBody.startIndex).limit(searchBody.count)
+            .map { it.toScimUser(searchBody.attributes, searchBody.excludedAttributes) }.collect(Collectors.toList())
 
-        return ListResponse(users().count(), userResources.size.toLong(), searchBody.startIndex + 1, userResources)
+        return ScimListResponse(users().count(), userResources.size.toLong(), searchBody.startIndex + 1, userResources)
     }
 
-    fun findGroups(searchBody: SearchBody): ListResponse {
+    fun getGroup(id: String): ScimGroup? {
+        return session.groups().getGroupById(session.context.realm, id)?.toScimGroup(session)
+    }
+
+    fun findGroups(searchBody: SearchBody): ScimListResponse {
         val realm = session.context.realm
         val groups = {
             searchBody.filter?.let { attribute ->
@@ -59,26 +54,13 @@ class ScimImpl(private val session: KeycloakSession) {
             } ?: session.groups().getGroupsStream(realm)
         }
 
-        val groupResources = groups()
-            .skip(searchBody.startIndex)
-            .limit(searchBody.count)
-            .map { group ->
-                (group.attributes + mapOf(
-                    "name" to listOf(group.name),
-                    "members" to (if (searchBody.attributes.contains("members")) session.users()
-                        .getGroupMembersStream(realm, group).map { it.id }.collect(Collectors.toList()) else listOf()),
-                ))
-                    .filter { searchBody.attributes.contains(it.key) }
-                    .filterNot { searchBody.excludedAttributes.contains(it.key) }.filterNot { it.key == "id" }
-                    .flatMap { attr ->
-                        if (listOf("name").contains(attr.key)) listOf(attr.key to attr.value.first())
-                        else attr.value.mapIndexed { index, value -> "${attr.key}[$index]" to value }
-                    }
-                    .toMap() + mapOf("id" to group.id)
-            }
-            .collect(Collectors.toList()).toList()
+        val groupResources = groups().skip(searchBody.startIndex).limit(searchBody.count)
+            .map { it.toScimGroup(session, searchBody.attributes, searchBody.excludedAttributes) }
+            .collect(Collectors.toList())
 
-        return ListResponse(groups().count(), groupResources.size.toLong(), searchBody.startIndex + 1, groupResources)
+        return ScimListResponse(
+            groups().count(), groupResources.size.toLong(), searchBody.startIndex + 1, groupResources
+        )
     }
 
 }

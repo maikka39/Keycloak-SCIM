@@ -50,6 +50,14 @@ class ScimRestResource(private val session: KeycloakSession) {
     @Path("Users/{id}")
     @Produces(OtherMediaType.APPLICATION_SCIM_JSON)
     fun getUser(@PathParam("id") id: String): Response {
+        val user = scim.getUser(id)
+        return (user?.let { Response.status(200).entity(it) } ?: Response.status(404)).build()
+    }
+
+    @PUT
+    @Path("Users/{id}")
+    @Produces(OtherMediaType.APPLICATION_SCIM_JSON)
+    fun putUser(@PathParam("id") id: String): Response {
         val user = session.users().getUserById(session.context.realm, id)
         return (user?.let { Response.status(200).entity(it.id) } ?: Response.status(404)).build()
     }
@@ -73,7 +81,7 @@ class ScimRestResource(private val session: KeycloakSession) {
     @Path("Groups/{id}")
     @Produces(OtherMediaType.APPLICATION_SCIM_JSON)
     fun getGroup(@PathParam("id") id: String): Response {
-        val group = session.groups().getGroupById(session.context.realm, id)
-        return (group?.let { Response.status(200).entity(it.id) } ?: Response.status(404)).build()
+        val group = scim.getGroup(id)
+        return (group?.let { Response.status(200).entity(it) } ?: Response.status(404)).build()
     }
 }

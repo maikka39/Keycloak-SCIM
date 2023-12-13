@@ -23,7 +23,7 @@ data class SearchBody(
     ) : this(
         max(1, startIndex ?: 1) - 1,
         min(max(0, count ?: 100), 1000),
-        (attributes ?: "userName").split(','),
+        (attributes ?: "").split(','),
         (excludedAttributes ?: "").split(','),
         filter?.let {
             val regex = "(\\w+) eq \"([^\"]*)\""

@@ -3,5 +3,10 @@ services:
     build:
       context: .
     ports:
-    - 8080:8080
+      - 8080:8080
     command: --verbose start-dev
+    volumes:
+      - db:/opt/keycloak/data/h2
+
+volumes:
+  db:
