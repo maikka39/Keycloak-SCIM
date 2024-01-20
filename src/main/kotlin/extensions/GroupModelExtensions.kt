@@ -26,7 +26,7 @@ fun GroupModel.toScimGroup(
         "id" to { this.id },
         "externalId" to { null },
         "displayName" to { this.name },
-        "members" to { // TODO: Add group members?
+        "members" to {
             session.users().getGroupMembersStream(session.context.realm, this)
                 .map { it.toScimUser(listOf("displayName")) }
                 .map { ScimMultiValued(value = it.id, type = "User", display = it.displayName, ref = "Users/${it.id}") }

@@ -1,9 +1,7 @@
 import extensions.toScimGroup
 import extensions.toScimUser
 import models.SearchBody
-import models.scim.ScimGroup
-import models.scim.ScimListResponse
-import models.scim.ScimUser
+import models.scim.*
 import org.keycloak.models.KeycloakSession
 import java.util.stream.Collectors
 
@@ -63,4 +61,23 @@ class ScimImpl(private val session: KeycloakSession) {
         )
     }
 
+    fun getResourceType(id: String): ScimResourceType? {
+        return when (id) {
+            "User" -> ScimUser.resourceType
+            "Group" -> ScimGroup.resourceType
+            else -> null
+        }
+    }
+
+    fun getSchema(id: String): ScimSchema? {
+        return when (id) {
+            "urn:ietf:params:scim:schemas:core:2.0:User" -> ScimUser.schema
+            "urn:ietf:params:scim:schemas:core:2.0:Group" -> ScimGroup.schema
+            "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User" -> ScimEnterpriseUser.schema
+            "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig" -> ScimServiceProviderConfig.schema
+            "urn:ietf:params:scim:schemas:core:2.0:ResourceType" -> ScimResourceType.schema
+            "urn:ietf:params:scim:schemas:core:2.0:Schema" -> ScimSchema.schema
+            else -> null
+        }
+    }
 }

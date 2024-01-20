@@ -1,8 +1,11 @@
 import jakarta.ws.rs.*
+import jakarta.ws.rs.core.Context
 import jakarta.ws.rs.core.MediaType
 import jakarta.ws.rs.core.Response
 import models.OtherMediaType
 import models.SearchBody
+import models.scim.ScimMeta
+import org.keycloak.http.HttpRequest
 import org.keycloak.models.KeycloakSession
 import org.keycloak.services.resources.Cors
 import kotlin.math.max
@@ -83,5 +86,39 @@ class ScimRestResource(private val session: KeycloakSession) {
     fun getGroup(@PathParam("id") id: String): Response {
         val group = scim.getGroup(id)
         return (group?.let { Response.status(200).entity(it) } ?: Response.status(404)).build()
+    }
+
+    @GET
+    @Path("ResourceTypes/{id}")
+    @Produces(OtherMediaType.APPLICATION_SCIM_JSON)
+    fun getResourceType(@Context request: HttpRequest, @PathParam("id") id: String): Response {
+        val resourceType = scim.getResourceType(id)
+        return (resourceType?.let {
+            Response.status(200).entity(
+                it.copy(
+                    meta = ScimMeta(
+                        location = request.uri.absolutePath.rawPath,
+                        resourceType = "ResourceType"
+                    )
+                )
+            )
+        } ?: Response.status(404)).build()
+    }
+
+    @GET
+    @Path("Schemas/{id}")
+    @Produces(OtherMediaType.APPLICATION_SCIM_JSON)
+    fun getSchema(@Context request: HttpRequest, @PathParam("id") id: String): Response {
+        val schema = scim.getSchema(id)
+        return (schema?.let {
+            Response.status(200).entity(
+                it.copy(
+                    meta = ScimMeta(
+                        location = request.uri.absolutePath.rawPath,
+                        resourceType = "Schema"
+                    )
+                )
+            )
+        } ?: Response.status(404)).build()
     }
 }

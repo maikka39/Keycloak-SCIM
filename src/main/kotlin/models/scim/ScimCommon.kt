@@ -1,6 +1,6 @@
 package models.scim
 
 interface ScimCommon {
-    val id: String
-    val externalId: String?
+    val schemas: List<String>
+    val meta: ScimMeta?
 }
